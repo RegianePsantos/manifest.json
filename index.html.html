@@ -1,0 +1,1188 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Grajaú Circular AI • Radar Inteligente & Match Tinder</title>
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --green-deep: #064e3b;
+      --green-main: #10b981;
+      --green-bright: #059669;
+      --blue-pen: #0033cc;
+      --blue-pen-light: #1d4ed8;
+      --blue-glow: rgba(0, 51, 204, 0.28);
+      --green-glow: rgba(16, 185, 129, 0.28);
+      --bg-gradient: linear-gradient(135deg, #ecfdf5 0%, #eff6ff 55%, #dbeafe 100%);
+      --card-bg: rgba(255, 255, 255, 0.94);
+      --text-main: #0f172a;
+      --text-muted: #475569;
+      --border: rgba(0, 51, 204, 0.16);
+      --radius: 20px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Plus Jakarta Sans', 'Segoe UI', sans-serif; }
+
+    body {
+      background: var(--bg-gradient);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+      position: relative;
+    }
+
+    /* ================= PARTÍCULAS FLUTUANTES DE RECICLAGEM ================= */
+    .floating-eco-bg {
+      position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden;
+    }
+    .eco-particle {
+      position: absolute; bottom: -60px; font-size: 24px; opacity: 0.16;
+      animation: floatUp linear infinite; user-select: none;
+    }
+    @keyframes floatUp {
+      0% { transform: translateY(0) rotate(0deg) scale(0.8); opacity: 0; }
+      20% { opacity: 0.22; }
+      80% { opacity: 0.2; }
+      100% { transform: translateY(-115vh) rotate(360deg) scale(1.15); opacity: 0; }
+    }
+
+    /* ================= HEADER VERDE + AZUL CANETA ================= */
+    header {
+      position: relative; z-index: 10;
+      background: linear-gradient(120deg, var(--green-deep) 0%, var(--green-bright) 48%, var(--blue-pen) 100%);
+      background-size: 200% 200%;
+      animation: gradientShift 8s ease infinite;
+      color: #fff;
+      padding: 14px 22px;
+      display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px;
+      box-shadow: 0 8px 25px rgba(0, 51, 204, 0.25);
+    }
+    @keyframes gradientShift {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .brand-icon {
+      width: 46px; height: 46px; border-radius: 14px;
+      background: rgba(255, 255, 255, 0.2); border: 1.5px solid rgba(255, 255, 255, 0.45);
+      display: flex; align-items: center; justify-content: center; font-size: 24px;
+      animation: spinSlow 10s linear infinite;
+    }
+    @keyframes spinSlow { to { transform: rotate(360deg); } }
+    .brand h1 { font-size: 1.22rem; font-weight: 800; letter-spacing: -0.02em; }
+    .brand span { font-size: 0.78rem; opacity: 0.92; display: block; }
+
+    /* ================= ESTEIRA DE RESÍDUOS ================= */
+    .eco-ticker {
+      position: relative; z-index: 9;
+      background: linear-gradient(90deg, #001f80, var(--blue-pen), #047857);
+      color: #fff; padding: 6px 0; overflow: hidden; white-space: nowrap; font-size: 0.8rem; font-weight: 700;
+    }
+    .ticker-track { display: inline-block; padding-left: 100%; animation: marquee 26s linear infinite; }
+    @keyframes marquee { 0% { transform: translateX(0); } 100% { transform: translateX(-100%); } }
+    .ticker-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: rgba(255,255,255,0.16); padding: 2px 10px; border-radius: 999px; margin: 0 10px;
+    }
+
+    /* ================= LAYOUT PRINCIPAL ================= */
+    main {
+      position: relative; z-index: 5;
+      max-width: 1340px; width: 100%; margin: 16px auto; padding: 0 16px;
+      display: grid; grid-template-columns: 1.25fr 0.75fr; gap: 18px; flex: 1;
+    }
+    @media (max-width: 960px) { main { grid-template-columns: 1fr; } }
+
+    .card {
+      background: var(--card-bg);
+      backdrop-filter: blur(12px);
+      border-radius: var(--radius);
+      border: 1.5px solid var(--border);
+      padding: 18px;
+      box-shadow: 0 12px 32px rgba(0, 51, 204, 0.09);
+      display: flex; flex-direction: column; gap: 12px;
+    }
+
+    .card-header {
+      display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;
+      border-bottom: 2px solid rgba(16, 185, 129, 0.22); padding-bottom: 10px; gap: 8px;
+    }
+    .card-header h2 {
+      font-size: 1.05rem; font-weight: 800;
+      background: linear-gradient(90deg, var(--green-deep), var(--blue-pen));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+
+    /* ================= MAPA INTELIGENTE & OVERLAYS ================= */
+    .map-wrapper {
+      position: relative;
+      border-radius: 16px;
+      overflow: hidden;
+      border: 2.5px solid var(--blue-pen);
+      box-shadow: 0 10px 28px rgba(0, 51, 204, 0.22);
+    }
+
+    #map {
+      height: 500px;
+      width: 100%;
+      z-index: 1;
+      background: #0f172a;
+    }
+
+    /* Painel Flutuante de IA sobre o Mapa */
+    .ai-hud {
+      position: absolute;
+      top: 12px; left: 54px; right: 12px;
+      z-index: 500;
+      display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px;
+      pointer-events: none;
+    }
+    .ai-pill {
+      pointer-events: auto;
+      background: rgba(15, 23, 42, 0.88);
+      backdrop-filter: blur(8px);
+      color: #fff;
+      border: 1.5px solid rgba(16, 185, 129, 0.6);
+      padding: 7px 13px;
+      border-radius: 999px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      display: inline-flex; align-items: center; gap: 7px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    }
+    .ai-dot {
+      width: 9px; height: 9px; border-radius: 50%; background: #10b981;
+      box-shadow: 0 0 10px #10b981;
+      animation: blinkAi 1.2s infinite alternate;
+    }
+    @keyframes blinkAi { from { opacity: 0.4; transform: scale(0.8); } to { opacity: 1; transform: scale(1.25); } }
+
+    .map-controls-bar {
+      display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between;
+    }
+
+    /* ================= DESENHOS SVG DIFERENCIADOS NO MAPA ================= */
+    .custom-svg-pin {
+      background: transparent !important;
+      border: none !important;
+    }
+    .pin-container {
+      position: relative;
+      width: 48px; height: 48px;
+      display: flex; align-items: center; justify-content: center;
+      transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    .pin-container:hover {
+      transform: scale(1.22) translateY(-4px);
+      z-index: 9999 !important;
+    }
+    .radar-ring {
+      position: absolute;
+      width: 46px; height: 46px;
+      border-radius: 50%;
+      animation: radarWave 1.8s ease-out infinite;
+    }
+    .ring-doador { border: 2.5px solid #10b981; background: rgba(16, 185, 129, 0.18); }
+    .ring-catador { border: 2.5px solid #0033cc; background: rgba(0, 51, 204, 0.2); }
+    .ring-pev { border: 2.5px solid #7c3aed; background: rgba(124, 58, 237, 0.16); }
+
+    @keyframes radarWave {
+      0% { transform: scale(0.65); opacity: 0.95; }
+      100% { transform: scale(1.65); opacity: 0; }
+    }
+
+    .pin-label-float {
+      position: absolute;
+      bottom: -14px;
+      background: #0f172a;
+      color: #fff;
+      font-size: 9.5px;
+      font-weight: 800;
+      padding: 1px 6px;
+      border-radius: 6px;
+      white-space: nowrap;
+      border: 1px solid rgba(255,255,255,0.3);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+    }
+
+    /* Linha de Rota Inteligente Animada */
+    .ai-route-line {
+      stroke-dasharray: 10, 10;
+      animation: dashFlow 0.8s linear infinite;
+    }
+    @keyframes dashFlow {
+      to { stroke-dashoffset: -20; }
+    }
+
+    /* ================= TINDER SWIPE DECK (ALTA VELOCIDADE) ================= */
+    .tinder-deck-wrapper {
+      position: relative;
+      width: 100%;
+      min-height: 365px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      perspective: 1000px;
+    }
+
+    .swipe-card {
+      width: 100%;
+      background: linear-gradient(160deg, #ffffff 0%, #f0fdf4 55%, #eff6ff 100%);
+      border: 2px solid rgba(0, 51, 204, 0.22);
+      border-radius: 22px;
+      padding: 18px;
+      box-shadow: 0 16px 36px rgba(0, 51, 204, 0.15);
+      position: relative;
+      user-select: none;
+      touch-action: pan-y;
+      cursor: grab;
+      transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.25s ease;
+    }
+    .swipe-card:active { cursor: grabbing; }
+
+    .swipe-card.fly-right {
+      transform: translateX(140%) rotate(22deg) !important;
+      opacity: 0 !important;
+    }
+    .swipe-card.fly-left {
+      transform: translateX(-140%) rotate(-22deg) !important;
+      opacity: 0 !important;
+    }
+
+    /* Carimbos estilo Tinder (ACEITAR / PULAR) */
+    .stamp {
+      position: absolute;
+      top: 18px;
+      padding: 6px 14px;
+      border-radius: 10px;
+      font-size: 1.15rem;
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      opacity: 0;
+      transform: scale(0.8);
+      transition: opacity 0.12s ease, transform 0.12s ease;
+      pointer-events: none;
+      z-index: 20;
+    }
+    .stamp-like {
+      left: 18px;
+      color: #059669;
+      border: 3.5px solid #059669;
+      background: rgba(236, 253, 245, 0.92);
+      transform: rotate(-12deg);
+    }
+    .stamp-nope {
+      right: 18px;
+      color: #dc2626;
+      border: 3.5px solid #dc2626;
+      background: rgba(254, 242, 242, 0.92);
+      transform: rotate(12deg);
+    }
+
+    .tinder-header-badge {
+      display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;
+    }
+    .ai-score-tag {
+      background: linear-gradient(135deg, var(--green-bright), var(--blue-pen));
+      color: #fff; font-size: 0.75rem; font-weight: 800; padding: 4px 10px; border-radius: 999px;
+      display: inline-flex; align-items: center; gap: 4px;
+    }
+    .dist-tag {
+      background: #dbeafe; color: var(--blue-pen); font-size: 0.76rem; font-weight: 800;
+      padding: 4px 10px; border-radius: 999px;
+    }
+
+    .tinder-illustration {
+      background: linear-gradient(135deg, rgba(16,185,129,0.12), rgba(0,51,204,0.12));
+      border-radius: 16px;
+      padding: 14px;
+      display: flex; align-items: center; gap: 14px;
+      margin-bottom: 12px;
+      border: 1px dashed rgba(0,51,204,0.25);
+    }
+    .tinder-big-emoji {
+      font-size: 46px;
+      filter: drop-shadow(0 6px 10px rgba(0,51,204,0.2));
+      animation: floatIcon 2s ease-in-out infinite alternate;
+    }
+    @keyframes floatIcon { from { transform: translateY(0); } to { transform: translateY(-6px); } }
+
+    .tinder-actions {
+      display: flex; justify-content: center; align-items: center; gap: 18px; margin-top: 14px;
+    }
+    .t-btn {
+      width: 58px; height: 58px; border-radius: 50%; border: none;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 24px; cursor: pointer;
+      transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+    }
+    .t-btn:hover { transform: scale(1.14); }
+    .t-btn:active { transform: scale(0.94); }
+    .t-btn-nope { background: #fff; color: #ef4444; border: 2px solid #fecaca; }
+    .t-btn-turbo { background: linear-gradient(135deg, #2563eb, #0033cc); color: #fff; width: 48px; height: 48px; font-size: 19px; }
+    .t-btn-like { background: linear-gradient(135deg, #10b981, #059669); color: #fff; }
+
+    /* ================= MODAL DE MATCH INSTANTÂNEO (ESTILO TINDER) ================= */
+    .match-overlay {
+      position: fixed; inset: 0; z-index: 9999;
+      background: rgba(6, 78, 59, 0.88);
+      backdrop-filter: blur(10px);
+      display: flex; align-items: center; justify-content: center;
+      padding: 20px;
+      animation: fadeIn 0.25s ease;
+    }
+    .match-overlay[hidden] { display: none; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+    .match-box {
+      background: linear-gradient(160deg, #ffffff, #ecfdf5 60%, #eff6ff 100%);
+      border: 3px solid #10b981;
+      border-radius: 26px;
+      max-width: 430px; width: 100%;
+      padding: 26px; text-align: center;
+      box-shadow: 0 25px 60px rgba(0,0,0,0.45);
+      animation: popScale 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    @keyframes popScale { from { transform: scale(0.7); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+    .match-title {
+      font-size: 1.75rem; font-weight: 900;
+      background: linear-gradient(90deg, var(--green-bright), var(--blue-pen));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      margin-bottom: 6px;
+    }
+
+    /* ================= FORMULÁRIOS E BOTÕES GERAIS ================= */
+    .form-group { display: flex; flex-direction: column; gap: 4px; }
+    label { font-size: 0.8rem; font-weight: 700; color: var(--blue-pen); }
+    input, select {
+      padding: 9px 12px; border: 1.5px solid #cbd5e1; border-radius: 10px;
+      font-size: 0.88rem; outline: none; background: #fff;
+    }
+    input:focus, select:focus { border-color: var(--blue-pen); box-shadow: 0 0 0 3px var(--blue-glow); }
+    .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+
+    .btn {
+      padding: 10px 14px; border: none; border-radius: 10px; font-weight: 700; font-size: 0.84rem;
+      cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    }
+    .btn-primary { background: linear-gradient(135deg, var(--green-bright), var(--blue-pen)); color: #fff; }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 18px var(--blue-glow); }
+    .btn-blue { background: var(--blue-pen); color: #fff; }
+    .btn-outline { background: #fff; color: var(--blue-pen); border: 1.5px solid var(--blue-pen); }
+    .btn-outline:hover { background: #eff6ff; }
+    .btn-sm { padding: 6px 10px; font-size: 0.76rem; border-radius: 8px; }
+
+    .legend {
+      display: flex; flex-wrap: wrap; gap: 12px; font-size: 0.78rem; font-weight: 700;
+      background: rgba(236, 253, 245, 0.85); padding: 8px 12px; border-radius: 12px;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+    .legend span { display: inline-flex; align-items: center; gap: 6px; }
+
+    .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+    .kpi {
+      background: linear-gradient(145deg, #ecfdf5, #eff6ff); border: 1.5px solid rgba(0, 51, 204, 0.18);
+      border-radius: 12px; padding: 10px; text-align: center;
+    }
+    .kpi strong { display: block; font-size: 1.25rem; color: var(--blue-pen); font-weight: 800; }
+    .kpi span { font-size: 0.72rem; color: var(--green-deep); font-weight: 700; }
+
+    .list-container { display: flex; flex-direction: column; gap: 9px; max-height: 360px; overflow-y: auto; }
+    .item-card {
+      border: 1.5px solid rgba(0, 51, 204, 0.14); border-left: 5px solid var(--green-main);
+      border-radius: 12px; padding: 11px; background: #fff; display: flex; flex-direction: column; gap: 5px;
+    }
+    .badge { padding: 3px 9px; border-radius: 999px; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; }
+    .st-aguardando { background: #fef3c7; color: #b45309; }
+    .st-atendimento { background: #dbeafe; color: var(--blue-pen); }
+    .st-concluida { background: #dcfce7; color: var(--green-deep); }
+    .item-meta { font-size: 0.81rem; color: var(--text-muted); line-height: 1.4; }
+    .system-note { background: #eff6ff; border: 1.5px solid #93c5fd; color: var(--blue-pen); padding: 9px 12px; border-radius: 10px; font-size: 0.79rem; font-weight: 600; }
+
+    #toastContainer { position: fixed; bottom: 18px; right: 18px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; }
+    .toast {
+      background: linear-gradient(135deg, var(--green-deep), var(--blue-pen)); color: #fff;
+      padding: 11px 16px; border-radius: 12px; font-size: 0.83rem; font-weight: 700;
+      box-shadow: 0 10px 24px rgba(0, 51, 204, 0.3);
+    }
+
+    footer {
+      position: relative; z-index: 5; text-align: center; padding: 13px; font-size: 0.78rem;
+      color: var(--blue-pen); font-weight: 700; border-top: 1.5px solid var(--border); background: rgba(255,255,255,0.92); margin-top: 18px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Partículas Flutuantes -->
+  <div class="floating-eco-bg" id="floatingBg" aria-hidden="true"></div>
+  <div id="toastContainer"></div>
+
+  <!-- Modal de Match Instantâneo Estilo Tinder -->
+  <div id="matchOverlay" class="match-overlay" hidden>
+    <div class="match-box">
+      <div style="font-size:48px;margin-bottom:6px;">♻️⚡🚛</div>
+      <div class="match-title">DEU MATCH ECOLÓGICO!</div>
+      <p style="font-size:0.88rem;color:#334155;margin-bottom:14px;">A Inteligência Artificial traçou a rota mais rápida até o doador em <strong>Grajaú - MA</strong>!</p>
+      <div id="matchDetails" style="background:#fff;border:1.5px solid #a7f3d0;border-radius:14px;padding:12px;text-align:left;font-size:0.84rem;margin-bottom:16px;line-height:1.5;"></div>
+      <div style="display:flex;gap:10px;justify-content:center;">
+        <button class="btn btn-primary" style="flex:1;" onclick="closeMatchAndNavigate()">🧭 Ver Rota no Radar</button>
+        <button class="btn btn-outline" onclick="closeMatchModal()">Continuar Swipe</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Header Verde + Azul Caneta -->
+  <header>
+    <div class="brand">
+      <div class="brand-icon">♻️</div>
+      <div>
+        <h1>Grajaú Circular AI • Radar & Match</h1>
+        <span>Mapa Inteligente de Alta Velocidade • Doadores, Catadores & Ecopontos • Grajaú - MA</span>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <span id="accountStatus" style="font-size:0.8rem;font-weight:700;background:rgba(255,255,255,0.18);padding:6px 12px;border-radius:999px;">Modo Radar Ativo</span>
+      <button id="demoPreviewBtn" class="btn btn-outline btn-sm" style="background:#fff;color:#0033cc;" onclick="toggleDemoMode()">⚡ Simulador Rápido</button>
+      <button id="logoutBtn" class="btn btn-outline btn-sm" style="background:#fff;color:#0033cc;" hidden onclick="logout()">Sair</button>
+    </div>
+  </header>
+
+  <!-- Esteira de Resíduos -->
+  <div class="eco-ticker" aria-hidden="true">
+    <div class="ticker-track">
+      <span class="ticker-badge">🧠 IA Roteirizadora Ativa em Grajaú - MA</span>
+      <span class="ticker-badge">⚡ Swipe Estilo Tinder: Deslize para Direita para Aceitar Coleta</span>
+      <span class="ticker-badge">🚛 Catadores Geolocalizados em Tempo Real</span>
+      <span class="ticker-badge">🏠 Doadores de Papelão, PET, Alumínio, Vidro e Lâmpadas</span>
+      <span class="ticker-badge">🏛️ PEVs Oficiais Integrados</span>
+    </div>
+  </div>
+
+  <!-- Painel de Login Supabase (Oculto automaticamente quando no Modo Radar/Demo) -->
+  <section id="authPanel" class="card" style="max-width:500px;width:calc(100% - 32px);margin:20px auto" hidden>
+    <div class="card-header"><h2>🔐 Acesso ao Grajaú Circular</h2></div>
+    <p class="item-meta">Entre com sua conta Supabase ou clique em <strong>Simulador Rápido</strong> no topo para usar o Radar IA agora.</p>
+    <div class="form-group"><label>Nome completo (cadastro)</label><input id="authName" placeholder="Seu nome"></div>
+    <div class="form-group"><label>E-mail</label><input id="authEmail" type="email" placeholder="voce@email.com"></div>
+    <div class="form-group"><label>Senha</label><input id="authPassword" type="password" placeholder="Mínimo 8 caracteres"></div>
+    <div class="row-2">
+      <button class="btn btn-primary" onclick="signIn()">🚀 Entrar</button>
+      <button class="btn btn-outline" onclick="signUp()">📝 Criar conta</button>
+    </div>
+    <p id="authMessage" class="system-note">Configure SUPABASE_URL e SUPABASE_ANON_KEY no código para conectar ao banco.</p>
+  </section>
+
+  <!-- Painel Principal: Mapa Inteligente + Tinder Swipe -->
+  <main id="appMain">
+    <!-- COLUNA ESQUERDA: MAPA DE ALTA VELOCIDADE COM DESENHOS VETORIAIS DIFERENCIADOS -->
+    <section class="card">
+      <div class="card-header">
+        <h2>🛰️ Mapa Inteligente de Grajaú – MA</h2>
+        <div class="map-controls-bar">
+          <select id="roleSwitcher" onchange="switchRole(this.value)" style="padding:5px 9px;font-size:0.78rem;border-color:#0033cc;color:#0033cc;font-weight:800;">
+            <option value="catador">🚛 Modo Catador (Swipe Tinder)</option>
+            <option value="cidadao">🏠 Modo Doador de Lixo</option>
+            <option value="gestao">🏛️ Modo Gestão / PEVs</option>
+          </select>
+          <button class="btn btn-blue btn-sm" onclick="toggleMapTheme()" id="themeBtn">🌙 Mapa Radar Escuro</button>
+          <button class="btn btn-primary btn-sm" onclick="runSmartRouteAI()">🧠 Rota IA Ótima</button>
+        </div>
+      </div>
+
+      <div class="map-wrapper">
+        <!-- HUD de Inteligência Artificial flutuando sobre o mapa -->
+        <div class="ai-hud">
+          <div class="ai-pill"><span class="ai-dot"></span><span id="aiHudText">IA Radar: 4 doadores próximos • 3 catadores ativos</span></div>
+          <div class="ai-pill" style="border-color:#3b82f6;" id="aiRouteStats">⚡ Rota Ótima: 1.8 km (~4 min)</div>
+        </div>
+        <div id="map"></div>
+      </div>
+
+      <!-- Legenda com os Desenhos Diferenciados -->
+      <div class="legend">
+        <span>🟢 <strong>Doador de Recicláveis</strong> (Casa/Comércio)</span>
+        <span>🔵 <strong>Catador em Movimento</strong> (Carrinho/Triciclo)</span>
+        <span>🟣 <strong>Ecoponto / PEV</strong> (Base Fixa)</span>
+        <span>⚡ <strong>Linha Azul/Verde:</strong> Rota Inteligente IA</span>
+      </div>
+    </section>
+
+    <!-- COLUNA DIREITA: TINDER SWIPE OU FORMULÁRIO DOADOR/GESTÃO -->
+    <section class="card" id="dynamicPanel"></section>
+  </main>
+
+  <footer>Grajaú Circular AI • Mapa Inteligente & Match em Alta Velocidade • Paleta Verde & Azul Caneta • UEMA / Grajaú - MA, 2026</footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script>
+    // ================= 1) PARTÍCULAS ECOLÓGICAS =================
+    (function initParticles() {
+      const bg = document.getElementById('floatingBg');
+      const icons = ['♻️', '🧴', '📦', '🥫', '🍾', '💡', '🔋', '🌱'];
+      for (let i = 0; i < 18; i++) {
+        const el = document.createElement('div');
+        el.className = 'eco-particle';
+        el.textContent = icons[i % icons.length];
+        el.style.left = `${Math.random() * 95}%`;
+        el.style.animationDuration = `${14 + Math.random() * 14}s`;
+        el.style.animationDelay = `${-Math.random() * 15}s`;
+        bg.appendChild(el);
+      }
+    })();
+
+    function showToast(text) {
+      const c = document.getElementById('toastContainer');
+      const t = document.createElement('div');
+      t.className = 'toast';
+      t.textContent = text;
+      c.appendChild(t);
+      setTimeout(() => t.remove(), 3000);
+    }
+
+    function escapeHTML(v) {
+      return String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+
+    // ================= 2) CONFIGURAÇÃO SUPABASE + DADOS INICIAIS INTELIGENTES =================
+    const SUPABASE_URL = 'COLE_AQUI_A_URL_DO_PROJETO';
+    const SUPABASE_ANON_KEY = 'COLE_AQUI_A_CHAVE_PUBLICA_ANON';
+    const CONFIGURED = SUPABASE_URL.startsWith('https://') && !SUPABASE_URL.includes('COLE_AQUI') && !SUPABASE_ANON_KEY.includes('COLE_AQUI');
+    let db = CONFIGURED && window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+
+    const GRAJAU_CENTER = [-5.8211, -46.1536];
+    const GRAJAU_BOUNDS = L.latLngBounds([-5.8750, -46.2150], [-5.7650, -46.0900]);
+
+    let currentUser = { id: 'catador-01', email: 'catador@grajau.ma.gov.br' };
+    let currentProfile = { id: 'catador-01', full_name: 'João Batista (Catador)', role: 'catador' };
+    let selectedCoords = { lat: -5.8205, lng: -46.1525 };
+    let selectedPevCoords = { lat: -5.8230, lng: -46.1550 };
+    let isDarkRadar = true;
+    let activeRouteLayer = null;
+    let lastMatchedRequest = null;
+
+    // Catadores georreferenciados em movimento em Grajaú - MA
+    let catadores = [
+      { id: 'CAT-01', nome: 'João Batista (Você)', veiculo: 'Triciclo Elétrico', lat: -5.8218, lng: -46.1540, status: 'Online' },
+      { id: 'CAT-02', nome: 'Raimundo Nonato', veiculo: 'Carrinho Coletor', lat: -5.8178, lng: -46.1502, status: 'Em Rota' },
+      { id: 'CAT-03', nome: 'Francisca das Chagas', veiculo: 'Utilitário Leve', lat: -5.8262, lng: -46.1568, status: 'Online' }
+    ];
+
+    // Solicitações de Doadores de Lixo Reciclável
+    let requests = [
+      { id: 'SOL-101', owner_id: 'doador-1', solicitante: 'Supermercado Central', bairro: 'Centro', material: 'Papel / Papelão', quantidade: '12 caixas prensadas (~35 kg)', observacoes: 'Portão lateral da Av. Principal', lat: -5.8194, lng: -46.1518, status: 'aguardando', catador_id: null },
+      { id: 'SOL-102', owner_id: 'doador-2', solicitante: 'Residência Dona Lúcia', bairro: 'Canoas', material: 'Plástico (PET/PEAD)', quantidade: '4 sacos grandes de garrafas', observacoes: 'Garrafas lavadas e amassadas', lat: -5.8242, lng: -46.1562, status: 'aguardando', catador_id: null },
+      { id: 'SOL-103', owner_id: 'doador-3', solicitante: 'Eletro & Luz Grajaú', bairro: 'Expoagra', material: 'Lâmpadas Recicláveis', quantidade: '20 lâmpadas LED intactas', observacoes: 'Embaladas em caixa original', lat: -5.8158, lng: -46.1488, status: 'aguardando', catador_id: null },
+      { id: 'SOL-104', owner_id: 'doador-4', solicitante: 'Espetinho do Rio', bairro: 'Beira Rio', material: 'Metal / Alumínio', quantidade: '3 sacos de latinhas (~18 kg)', observacoes: 'Retirar após as 14h', lat: -5.8255, lng: -46.1510, status: 'aguardando', catador_id: null }
+    ];
+
+    let pevs = [
+      { id: 'PEV-01', nome: 'Ecoponto Secretaria de Meio Ambiente', endereco: 'Centro, Grajaú - MA', lat: -5.8211, lng: -46.1536 },
+      { id: 'PEV-02', nome: 'Base Associação dos Catadores', endereco: 'Canoeiro, Grajaú - MA', lat: -5.8280, lng: -46.1490 }
+    ];
+
+    let contactMap = {
+      'SOL-101': '(99) 99122-3344',
+      'SOL-102': '(99) 98811-2233',
+      'SOL-103': '(99) 99155-7788',
+      'SOL-104': '(99) 98400-9911'
+    };
+
+    // ================= 3) DESENHOS VETORIAIS SVG ULTRA DIFERENCIADOS PARA O MAPA =================
+    function getSvgMarkerIcon(type, label, extraEmoji = '') {
+      if (type === 'doador') {
+        // Desenho de Casa Verde Neon com Símbolo de Reciclagem e Radar
+        return L.divIcon({
+          className: 'custom-svg-pin',
+          iconSize: [48, 48],
+          iconAnchor: [24, 24],
+          html: `
+            <div class="pin-container">
+              <div class="radar-ring ring-doador"></div>
+              <svg width="42" height="42" viewBox="0 0 48 48" fill="none">
+                <circle cx="24" cy="24" r="21" fill="#059669" stroke="#ffffff" stroke-width="3"/>
+                <path d="M14 23L24 14L34 23V33C34 33.55 33.55 34 33 34H15C14.45 34 14 33.55 14 33V23Z" fill="#ecfdf5"/>
+                <text x="24" y="29" text-anchor="middle" font-size="13">${extraEmoji || '♻️'}</text>
+              </svg>
+              <span class="pin-label-float" style="background:#064e3b;border-color:#10b981;">${escapeHTML(label)}</span>
+            </div>`
+        });
+      }
+      if (type === 'catador') {
+        // Desenho de Veículo Coletor Azul Caneta com Farol e Radar
+        return L.divIcon({
+          className: 'custom-svg-pin',
+          iconSize: [50, 50],
+          iconAnchor: [25, 25],
+          html: `
+            <div class="pin-container">
+              <div class="radar-ring ring-catador"></div>
+              <svg width="44" height="44" viewBox="0 0 48 48" fill="none">
+                <rect x="4" y="4" width="40" height="40" rx="14" fill="#0033cc" stroke="#ffffff" stroke-width="3"/>
+                <path d="M12 27H30V18H16L12 22V27Z" fill="#93c5fd"/>
+                <rect x="28" y="20" width="8" height="7" rx="1.5" fill="#ffffff"/>
+                <circle cx="17" cy="31" r="3.5" fill="#10b981" stroke="#fff" stroke-width="1.5"/>
+                <circle cx="32" cy="31" r="3.5" fill="#10b981" stroke="#fff" stroke-width="1.5"/>
+              </svg>
+              <span class="pin-label-float" style="background:#0033cc;border-color:#93c5fd;">🚛 ${escapeHTML(label)}</span>
+            </div>`
+        });
+      }
+      // Desenho de Ecoponto / PEV Roxo-Azul Institucional
+      return L.divIcon({
+        className: 'custom-svg-pin',
+        iconSize: [48, 48],
+        iconAnchor: [24, 24],
+        html: `
+          <div class="pin-container">
+            <div class="radar-ring ring-pev"></div>
+            <svg width="42" height="42" viewBox="0 0 48 48" fill="none">
+              <polygon points="24,3 44,15 44,35 24,45 4,35 4,15" fill="#4f46e5" stroke="#ffffff" stroke-width="3"/>
+              <text x="24" y="29" text-anchor="middle" font-size="16">🏛️</text>
+            </svg>
+            <span class="pin-label-float" style="background:#312e81;">PEV</span>
+          </div>`
+      });
+    }
+
+    // ================= 4) MAPA INTERATIVO DE ALTA VELOCIDADE =================
+    const map = L.map('map', {
+      center: GRAJAU_CENTER,
+      zoom: 15,
+      minZoom: 13,
+      maxBounds: GRAJAU_BOUNDS,
+      maxBoundsViscosity: 1.0,
+      zoomAnimation: true,
+      fadeAnimation: true
+    });
+
+    const darkTiles = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; OpenStreetMap &copy; CARTO • Grajaú AI'
+    });
+    const lightTiles = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; OpenStreetMap &copy; CARTO • Grajaú AI'
+    });
+
+    darkTiles.addTo(map);
+
+    function toggleMapTheme() {
+      isDarkRadar = !isDarkRadar;
+      const btn = document.getElementById('themeBtn');
+      if (isDarkRadar) {
+        map.removeLayer(lightTiles);
+        darkTiles.addTo(map);
+        btn.textContent = '☀️ Mapa Claro';
+      } else {
+        map.removeLayer(darkTiles);
+        lightTiles.addTo(map);
+        btn.textContent = '🌙 Mapa Radar Escuro';
+      }
+    }
+
+    const markersLayer = L.layerGroup().addTo(map);
+    let draftMarker = null;
+
+    map.on('click', e => {
+      if (!GRAJAU_BOUNDS.contains(e.latlng)) {
+        showToast('⚠️ Selecione um ponto dentro de Grajaú - MA.');
+        return;
+      }
+      const c = { lat: +e.latlng.lat.toFixed(6), lng: +e.latlng.lng.toFixed(6) };
+      if (currentProfile.role === 'cidadao') {
+        selectedCoords = c;
+        if (draftMarker) map.removeLayer(draftMarker);
+        draftMarker = L.marker([c.lat, c.lng], { icon: getSvgMarkerIcon('doador', 'Novo Ponto', '📍') }).addTo(map);
+        const inp = document.getElementById('coordsDisplay');
+        if (inp) inp.value = `${c.lat}, ${c.lng}`;
+        showToast('📍 Local da doação marcado no mapa!');
+      } else if (currentProfile.role === 'gestao') {
+        selectedPevCoords = c;
+        const inp = document.getElementById('pevCoordsDisplay');
+        if (inp) inp.value = `${c.lat}, ${c.lng}`;
+        showToast('🏛️ Coordenada do novo PEV selecionada!');
+      }
+    });
+
+    // ================= 5) INTELIGÊNCIA ARTIFICIAL DE ROTEIRIZAÇÃO E MATCH SCORE =================
+    function calcDistanceKm(lat1, lon1, lat2, lon2) {
+      const R = 6371;
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+
+    function getAiScore(req) {
+      const me = catadores[0];
+      const dist = calcDistanceKm(me.lat, me.lng, req.lat, req.lng);
+      const score = Math.max(74, Math.min(99, Math.round(100 - dist * 12)));
+      const etaMin = Math.max(2, Math.round(dist * 3.5));
+      return { dist: dist.toFixed(2), score, etaMin };
+    }
+
+    // Algoritmo Vizinho Mais Próximo (Nearest Neighbor TSP) para traçar rota ótima entre doadores
+    function runSmartRouteAI(focusReq = null) {
+      if (activeRouteLayer) {
+        map.removeLayer(activeRouteLayer);
+      }
+      const me = catadores[0];
+      const pending = requests.filter(r => r.status !== 'concluida');
+      if (pending.length === 0) {
+        showToast('✅ Nenhuma coleta pendente para roteirizar!');
+        return;
+      }
+
+      let points = [[me.lat, me.lng]];
+      let totalDist = 0;
+
+      if (focusReq) {
+        points.push([focusReq.lat, focusReq.lng]);
+        totalDist = calcDistanceKm(me.lat, me.lng, focusReq.lat, focusReq.lng);
+        map.flyTo([focusReq.lat, focusReq.lng], 16, { duration: 0.65 });
+      } else {
+        let unvisited = [...pending];
+        let curr = { lat: me.lat, lng: me.lng };
+        while (unvisited.length > 0) {
+          unvisited.sort((a, b) => calcDistanceKm(curr.lat, curr.lng, a.lat, a.lng) - calcDistanceKm(curr.lat, curr.lng, b.lat, b.lng));
+          const next = unvisited.shift();
+          totalDist += calcDistanceKm(curr.lat, curr.lng, next.lat, next.lng);
+          points.push([next.lat, next.lng]);
+          curr = next;
+        }
+        map.fitBounds(L.latLngBounds(points), { padding: [55, 55], maxZoom: 16 });
+      }
+
+      activeRouteLayer = L.polyline(points, {
+        color: '#10b981',
+        weight: 5,
+        opacity: 0.92,
+        className: 'ai-route-line'
+      }).addTo(map);
+
+      const mins = Math.max(2, Math.round(totalDist * 3.5));
+      document.getElementById('aiRouteStats').textContent = `⚡ Rota IA: ${totalDist.toFixed(2)} km (~${mins} min)`;
+      showToast(`🧠 Inteligência Artificial traçou a rota mais rápida (${totalDist.toFixed(2)} km)!`);
+    }
+
+    // Animação sutil dos catadores se deslocando em tempo real no mapa
+    setInterval(() => {
+      catadores.forEach((c, idx) => {
+        if (idx === 0) return;
+        c.lat += (Math.random() - 0.5) * 0.00035;
+        c.lng += (Math.random() - 0.5) * 0.00035;
+      });
+      renderMap();
+    }, 3500);
+
+    function renderMap() {
+      markersLayer.clearLayers();
+
+      // 1. Doadores de Lixo
+      requests.forEach(s => {
+        if (s.status === 'concluida') return;
+        const emoji = s.material.includes('Lâmpada') ? '💡' : s.material.includes('Plástico') ? '🧴' : s.material.includes('Metal') ? '🥫' : s.material.includes('Vidro') ? '🍾' : '📦';
+        const ai = getAiScore(s);
+        L.marker([s.lat, s.lng], { icon: getSvgMarkerIcon('doador', s.bairro, emoji) })
+          .addTo(markersLayer)
+          .bindPopup(`
+            <div style="font-family:sans-serif;min-width:190px;">
+              <strong style="color:#059669;font-size:13px;">🏠 Doador: ${escapeHTML(s.solicitante)}</strong><br>
+              <span>${emoji} ${escapeHTML(s.material)}</span><br>
+              <small>📦 ${escapeHTML(s.quantidade)}</small><br>
+              <small style="color:#0033cc;font-weight:bold;">🧠 Match IA: ${ai.score}% • ${ai.dist} km (${ai.etaMin} min)</small>
+            </div>
+          `);
+      });
+
+      // 2. Catadores
+      catadores.forEach(c => {
+        L.marker([c.lat, c.lng], { icon: getSvgMarkerIcon('catador', c.nome.split(' ')[0]) })
+          .addTo(markersLayer)
+          .bindPopup(`<strong>🚛 ${escapeHTML(c.nome)}</strong><br>Veículo: ${escapeHTML(c.veiculo)}<br>Status: <strong>${c.status}</strong>`);
+      });
+
+      // 3. Ecopontos / PEVs
+      pevs.forEach(p => {
+        L.marker([p.lat, p.lng], { icon: getSvgMarkerIcon('pev', 'PEV') })
+          .addTo(markersLayer)
+          .bindPopup(`<strong>🏛️ ${escapeHTML(p.nome)}</strong><br>${escapeHTML(p.endereco)}`);
+      });
+
+      const waitingCount = requests.filter(r => r.status === 'aguardando').length;
+      document.getElementById('aiHudText').textContent = `IA Radar: ${waitingCount} doadores ativos • ${catadores.length} catadores online`;
+    }
+
+    // ================= 6) INTERFACE ESTILO TINDER (SWIPE DE ALTA VELOCIDADE) =================
+    let swipeIndex = 0;
+
+    function renderPanel() {
+      const panel = document.getElementById('dynamicPanel');
+      const role = currentProfile.role;
+
+      if (role === 'catador') {
+        const available = requests.filter(r => r.status === 'aguardando');
+        const myAccepted = requests.filter(r => r.status === 'em_atendimento' && r.catador_id === currentUser.id);
+
+        if (available.length === 0) {
+          panel.innerHTML = `
+            <div class="card-header"><h2>⚡ Match de Coletas (Tinder Eco)</h2></div>
+            <div style="text-align:center;padding:28px 12px;">
+              <div style="font-size:48px;margin-bottom:8px;">🎉♻️</div>
+              <strong style="color:#0033cc;font-size:1.05rem;">Você zerou a fila de doadores próximos!</strong>
+              <p class="item-meta" style="margin:8px 0 14px;">Clique abaixo para recarregar novas doações simuladas ou conclua suas coletas em andamento.</p>
+              <button class="btn btn-primary" onclick="resetDemoCards()">🔄 Buscar Novos Doadores</button>
+            </div>
+            ${renderAcceptedList(myAccepted)}
+          `;
+          return;
+        }
+
+        if (swipeIndex >= available.length) swipeIndex = 0;
+        const current = available[swipeIndex];
+        const ai = getAiScore(current);
+        const emoji = current.material.includes('Lâmpada') ? '💡' : current.material.includes('Plástico') ? '🧴' : current.material.includes('Metal') ? '🥫' : current.material.includes('Vidro') ? '🍾' : '📦';
+
+        panel.innerHTML = `
+          <div class="card-header">
+            <h2>⚡ Match Rápido (Estilo Tinder)</h2>
+            <span style="font-size:0.76rem;font-weight:800;color:#059669;">${available.length} disponíveis</span>
+          </div>
+
+          <div class="tinder-deck-wrapper">
+            <div class="swipe-card" id="activeSwipeCard">
+              <div class="stamp stamp-like" id="stampLike">ACEITAR ♻️</div>
+              <div class="stamp stamp-nope" id="stampNope">PULAR ✖</div>
+
+              <div class="tinder-header-badge">
+                <span class="ai-score-tag">🧠 ${ai.score}% Match IA</span>
+                <span class="dist-tag">📍 ${ai.dist} km • ~${ai.etaMin} min</span>
+              </div>
+
+              <div class="tinder-illustration">
+                <div class="tinder-big-emoji">${emoji}</div>
+                <div>
+                  <strong style="font-size:1.05rem;color:#0f172a;display:block;">${escapeHTML(current.material)}</strong>
+                  <span style="font-size:0.84rem;color:#059669;font-weight:700;">${escapeHTML(current.quantidade)}</span>
+                </div>
+              </div>
+
+              <div style="font-size:0.86rem;line-height:1.5;color:#1e293b;">
+                <div><strong>🏠 Doador:</strong> ${escapeHTML(current.solicitante)}</div>
+                <div><strong>🏘️ Bairro:</strong> ${escapeHTML(current.bairro)} — Grajaú, MA</div>
+                <div><strong>📝 Obs:</strong> ${escapeHTML(current.observacoes || 'Pronto para retirada')}</div>
+              </div>
+            </div>
+
+            <div class="tinder-actions">
+              <button class="t-btn t-btn-nope" title="Pular para o próximo (Seta Esquerda)" onclick="triggerSwipe('left')">✖</button>
+              <button class="t-btn t-btn-turbo" title="Ver localização exata no mapa" onclick="focusOnMap('${current.id}')">🎯</button>
+              <button class="t-btn t-btn-like" title="Aceitar Coleta Agora (Seta Direita)" onclick="triggerSwipe('right')">♻️</button>
+            </div>
+            <small style="margin-top:8px;color:#64748b;font-weight:600;">Arraste o card ou use ⬅️ Pular / ➡️ Aceitar</small>
+          </div>
+
+          ${renderAcceptedList(myAccepted)}
+        `;
+
+        bindSwipeGestures(current);
+        focusOnMap(current.id, false);
+      } else if (role === 'cidadao') {
+        panel.innerHTML = `
+          <div class="card-header"><h2>🏠 Doar Lixo Reciclável</h2></div>
+          <p class="item-meta">Clique no mapa ao lado para marcar sua casa ou comércio e publicar sua doação no radar dos catadores.</p>
+          <form onsubmit="createDonation(event)" style="display:flex;flex-direction:column;gap:9px;">
+            <div class="row-2">
+              <div class="form-group"><label>Seu Nome / Comércio *</label><input id="inpNome" required value="Maria José Silva"></div>
+              <div class="form-group"><label>WhatsApp *</label><input id="inpContato" required value="(99) 99123-4567"></div>
+            </div>
+            <div class="row-2">
+              <div class="form-group"><label>Bairro em Grajaú *</label><input id="inpBairro" required placeholder="Ex: Centro, Canoas"></div>
+              <div class="form-group"><label>Tipo de Material *</label>
+                <select id="inpMaterial">
+                  <option>Papel / Papelão</option>
+                  <option>Plástico (PET/PEAD)</option>
+                  <option>Metal / Alumínio</option>
+                  <option>Vidro</option>
+                  <option>Lâmpadas Recicláveis</option>
+                </select>
+              </div>
+            </div>
+            <div class="row-2">
+              <div class="form-group"><label>Quantidade *</label><input id="inpQtd" required placeholder="Ex: 3 sacos / 10 caixas"></div>
+              <div class="form-group"><label>Coordenada no Mapa</label><input id="coordsDisplay" readonly value="${selectedCoords.lat}, ${selectedCoords.lng}" style="background:#f1f5f9;"></div>
+            </div>
+            <div class="form-group"><label>Ponto de referência</label><input id="inpObs" placeholder="Ex: Portão azul próximo à praça"></div>
+            <button class="btn btn-primary">🚀 Publicar Doação no Radar IA</button>
+          </form>
+        `;
+      } else {
+        const a = requests.filter(r => r.status === 'aguardando').length;
+        const b = requests.filter(r => r.status === 'em_atendimento').length;
+        const c = requests.filter(r => r.status === 'concluida').length;
+        panel.innerHTML = `
+          <div class="card-header"><h2>🏛️ Painel de Gestão & Ecopontos</h2></div>
+          <div class="kpi-grid">
+            <div class="kpi"><strong>${requests.length}</strong><span>Total</span></div>
+            <div class="kpi"><strong>${a}</strong><span>No Radar</span></div>
+            <div class="kpi"><strong>${b}</strong><span>Em Rota</span></div>
+            <div class="kpi"><strong>${c}</strong><span>Concluídas</span></div>
+          </div>
+          <form onsubmit="createPev(event)" style="display:flex;flex-direction:column;gap:8px;background:#eff6ff;padding:12px;border-radius:12px;">
+            <strong style="color:#0033cc;font-size:0.84rem;">➕ Novo Ecoponto / PEV em Grajaú</strong>
+            <input id="pevNome" required placeholder="Nome do PEV">
+            <input id="pevEnd" required placeholder="Endereço / Bairro">
+            <input id="pevCoordsDisplay" readonly value="${selectedPevCoords.lat}, ${selectedPevCoords.lng}" style="background:#fff;">
+            <button class="btn btn-primary">🏛️ Salvar Ecoponto</button>
+          </form>
+        `;
+      }
+    }
+
+    function renderAcceptedList(list) {
+      if (!list.length) return '';
+      return `
+        <div class="card-header" style="margin-top:6px;"><h2>🚛 Minhas Coletas em Rota (${list.length})</h2></div>
+        <div class="list-container">
+          ${list.map(s => `
+            <div class="item-card">
+              <div style="display:flex;justify-content:space-between;align-items:center;">
+                <strong>${escapeHTML(s.material)} — ${escapeHTML(s.solicitante)}</strong>
+                <span class="badge st-atendimento">Em Rota</span>
+              </div>
+              <div class="item-meta">
+                📍 ${escapeHTML(s.bairro)} • 📦 ${escapeHTML(s.quantidade)}<br>
+                📞 <strong>WhatsApp:</strong> ${escapeHTML(contactMap[s.id] || '(99) 99999-0000')}
+              </div>
+              <div style="display:flex;gap:8px;margin-top:4px;">
+                <button class="btn btn-blue btn-sm" onclick="focusOnMap('${s.id}', true)">🧭 Traçar Rota</button>
+                <button class="btn btn-primary btn-sm" onclick="finishRequest('${s.id}')">✅ Concluir</button>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }
+
+    // ================= 7) GESTOS DE ARRASTAR (DRAG / SWIPE) ESTILO TINDER =================
+    function bindSwipeGestures(currentReq) {
+      const card = document.getElementById('activeSwipeCard');
+      const stampLike = document.getElementById('stampLike');
+      const stampNope = document.getElementById('stampNope');
+      if (!card) return;
+
+      let startX = 0, currentX = 0, dragging = false;
+
+      const onStart = (x) => {
+        startX = x;
+        dragging = true;
+        card.style.transition = 'none';
+      };
+
+      const onMove = (x) => {
+        if (!dragging) return;
+        currentX = x - startX;
+        const rotate = currentX * 0.06;
+        card.style.transform = `translateX(${currentX}px) rotate(${rotate}deg)`;
+        if (currentX > 25) {
+          stampLike.style.opacity = Math.min(1, currentX / 90);
+          stampNope.style.opacity = 0;
+        } else if (currentX < -25) {
+          stampNope.style.opacity = Math.min(1, Math.abs(currentX) / 90);
+          stampLike.style.opacity = 0;
+        } else {
+          stampLike.style.opacity = 0;
+          stampNope.style.opacity = 0;
+        }
+      };
+
+      const onEnd = () => {
+        if (!dragging) return;
+        dragging = false;
+        card.style.transition = 'transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.25s ease';
+        if (currentX > 95) {
+          triggerSwipe('right');
+        } else if (currentX < -95) {
+          triggerSwipe('left');
+        } else {
+          card.style.transform = 'translateX(0) rotate(0deg)';
+          stampLike.style.opacity = 0;
+          stampNope.style.opacity = 0;
+        }
+        currentX = 0;
+      };
+
+      card.addEventListener('mousedown', e => onStart(e.clientX));
+      window.addEventListener('mousemove', e => onMove(e.clientX));
+      window.addEventListener('mouseup', onEnd);
+
+      card.addEventListener('touchstart', e => onStart(e.touches[0].clientX), { passive: true });
+      card.addEventListener('touchmove', e => onMove(e.touches[0].clientX), { passive: true });
+      card.addEventListener('touchend', onEnd);
+    }
+
+    function triggerSwipe(direction) {
+      const available = requests.filter(r => r.status === 'aguardando');
+      if (!available.length) return;
+      const current = available[swipeIndex % available.length];
+      const card = document.getElementById('activeSwipeCard');
+
+      if (card) {
+        card.classList.add(direction === 'right' ? 'fly-right' : 'fly-left');
+      }
+
+      setTimeout(async () => {
+        if (direction === 'right') {
+          current.status = 'em_atendimento';
+          current.catador_id = currentUser.id;
+          lastMatchedRequest = current;
+          if (db) {
+            await db.from('solicitacoes').update({ status: 'em_atendimento', catador_id: currentUser.id }).eq('id', current.id);
+          }
+          openMatchModal(current);
+        } else {
+          swipeIndex = (swipeIndex + 1) % available.length;
+          showToast('⏭️ Próximo doador no radar...');
+        }
+        renderMap();
+        renderPanel();
+      }, 220);
+    }
+
+    // Suporte a setas do teclado para velocidade máxima no desktop
+    document.addEventListener('keydown', e => {
+      if (currentProfile.role !== 'catador' || document.activeElement.tagName === 'INPUT') return;
+      if (e.key === 'ArrowRight') triggerSwipe('right');
+      if (e.key === 'ArrowLeft') triggerSwipe('left');
+    });
+
+    function openMatchModal(req) {
+      const ai = getAiScore(req);
+      document.getElementById('matchDetails').innerHTML = `
+        <strong>🏠 Doador:</strong> ${escapeHTML(req.solicitante)} (${escapeHTML(req.bairro)})<br>
+        <strong>♻️ Material:</strong> ${escapeHTML(req.material)} • ${escapeHTML(req.quantidade)}<br>
+        <strong>📞 WhatsApp Liberado:</strong> ${escapeHTML(contactMap[req.id] || '(99) 99122-3344')}<br>
+        <strong>🧭 Distância IA:</strong> ${ai.dist} km (~${ai.etaMin} min de deslocamento)
+      `;
+      document.getElementById('matchOverlay').hidden = false;
+    }
+
+    function closeMatchModal() {
+      document.getElementById('matchOverlay').hidden = true;
+    }
+
+    function closeMatchAndNavigate() {
+      closeMatchModal();
+      if (lastMatchedRequest) {
+        runSmartRouteAI(lastMatchedRequest);
+      }
+    }
+
+    function focusOnMap(id, drawRoute = true) {
+      const req = requests.find(r => r.id === id);
+      if (!req) return;
+      if (drawRoute) {
+        runSmartRouteAI(req);
+      } else {
+        map.flyTo([req.lat, req.lng], 15, { duration: 0.5 });
+      }
+    }
+
+    // ================= 8) AÇÕES DE DOAÇÃO, CONCLUSÃO E ALTERNÂNCIA DE PERFIL =================
+    async function createDonation(e) {
+      e.preventDefault();
+      const newReq = {
+        id: 'SOL-' + (100 + requests.length + 1),
+        owner_id: currentUser.id,
+        solicitante: document.getElementById('inpNome').value.trim(),
+        bairro: document.getElementById('inpBairro').value.trim(),
+        material: document.getElementById('inpMaterial').value,
+        quantidade: document.getElementById('inpQtd').value.trim(),
+        observacoes: document.getElementById('inpObs').value.trim(),
+        lat: selectedCoords.lat,
+        lng: selectedCoords.lng,
+        status: 'aguardando',
+        catador_id: null
+      };
+      contactMap[newReq.id] = document.getElementById('inpContato').value.trim();
+      requests.unshift(newReq);
+      if (db) {
+        await db.from('solicitacoes').insert(newReq);
+      }
+      renderMap();
+      runSmartRouteAI(newReq);
+      showToast('🎉 Doação publicada no Radar Inteligente!');
+    }
+
+    async function finishRequest(id) {
+      const req = requests.find(r => r.id === id);
+      if (req) req.status = 'concluida';
+      if (db) {
+        await db.from('solicitacoes').update({ status: 'concluida' }).eq('id', id);
+      }
+      if (activeRouteLayer) map.removeLayer(activeRouteLayer);
+      renderMap();
+      renderPanel();
+      showToast('✅ Coleta concluída! Parabéns pelo impacto ambiental.');
+    }
+
+    function createPev(e) {
+      e.preventDefault();
+      pevs.push({
+        id: 'PEV-' + (pevs.length + 1),
+        nome: document.getElementById('pevNome').value.trim(),
+        endereco: document.getElementById('pevEnd').value.trim(),
+        lat: selectedPevCoords.lat,
+        lng: selectedPevCoords.lng
+      });
+      renderMap();
+      renderPanel();
+      showToast('🏛️ Ecoponto cadastrado no mapa!');
+    }
+
+    function resetDemoCards() {
+      requests.forEach(r => { r.status = 'aguardando'; r.catador_id = null; });
+      swipeIndex = 0;
+      renderMap();
+      renderPanel();
+      showToast('🔄 Doadores recarregados no radar!');
+    }
+
+    function switchRole(newRole) {
+      currentProfile.role = newRole;
+      renderMap();
+      renderPanel();
+    }
+
+    function toggleDemoMode() {
+      const auth = document.getElementById('authPanel');
+      const main = document.getElementById('appMain');
+      const showingAuth = !auth.hidden;
+      auth.hidden = showingAuth;
+      main.hidden = !showingAuth;
+      if (showingAuth) {
+        setTimeout(() => { map.invalidateSize(); renderMap(); renderPanel(); }, 100);
+      }
+    }
+
+    // Inicialização Imediata em Alta Velocidade
+    window.addEventListener('DOMContentLoaded', () => {
+      renderMap();
+      renderPanel();
+      setTimeout(() => runSmartRouteAI(), 600);
+    });
+  </script>
+</body>
+</html>
